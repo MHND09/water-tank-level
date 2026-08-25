@@ -36,6 +36,7 @@ and `docs/project_decisions.md` for implementation decisions.
 ## Python ESP32 mock
 
 ```text
+python -m pip install -r tools/requirements.txt
 python tools/mock_esp32_server.py
 ```
 

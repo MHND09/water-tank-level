@@ -29,4 +29,26 @@ class SettingsStore {
       await preferences.setString('language', language);
     }
   }
+
+  StoredReading? loadLastReading() {
+    final distance = preferences.getDouble('lastGoodDistanceCm');
+    final recordedAtMs = preferences.getInt('lastGoodRecordedAtMs');
+    if (distance == null || recordedAtMs == null) return null;
+    return StoredReading(
+      level: LevelResponse(
+        distanceCm: distance,
+        ageSeconds: 0,
+        status: LevelStatus.ok,
+        firmware: preferences.getString('lastGoodFirmware') ?? 'unknown',
+      ),
+      recordedAt: DateTime.fromMillisecondsSinceEpoch(recordedAtMs),
+    );
+  }
+
+  Future<void> saveLastReading(LevelResponse level, DateTime recordedAt) async {
+    if (level.distanceCm == null || level.status != LevelStatus.ok) return;
+    await preferences.setDouble('lastGoodDistanceCm', level.distanceCm!);
+    await preferences.setInt('lastGoodRecordedAtMs', recordedAt.millisecondsSinceEpoch);
+    await preferences.setString('lastGoodFirmware', level.firmware);
+  }
 }

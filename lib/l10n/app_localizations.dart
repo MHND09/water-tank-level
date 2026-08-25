@@ -16,6 +16,16 @@ class AppLocalizations {
   String get tankOverview => isFrench ? 'Vue du réservoir' : 'Tank overview';
   String get liveMonitor => isFrench ? "Suivi en direct du niveau d'eau" : 'Live household water monitor';
   String get online => isFrench ? 'En ligne' : 'Online';
+  String get notLive => isFrench ? 'Hors ligne' : 'Not live';
+  String get unknown => isFrench ? 'Aucune mesure' : 'No reading';
+  String relativeTime(Duration age) {
+    if (age.isNegative || age.inSeconds < 10) return isFrench ? "à l'instant" : 'Just now';
+    if (age.inMinutes < 1) return isFrench ? 'il y a quelques secondes' : 'A few seconds ago';
+    if (age.inMinutes < 60) return isFrench ? 'il y a ${age.inMinutes} min' : '${age.inMinutes} min ago';
+    if (age.inHours < 24) return isFrench ? 'il y a ${age.inHours} h' : '${age.inHours} hr ago';
+    return isFrench ? 'il y a ${age.inDays} j' : '${age.inDays} days ago';
+  }
+  String savedAt(Object time) => isFrench ? 'Mesuré le $time' : 'Measured $time';
   String get currentLevel => isFrench ? 'Niveau actuel' : 'Current level';
   String get tankCapacity => isFrench ? 'de la capacité du réservoir' : 'of tank capacity';
   String get plentyWater => isFrench ? "Il y a beaucoup d'eau" : 'Plenty of water available';

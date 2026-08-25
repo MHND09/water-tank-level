@@ -51,7 +51,7 @@ class DashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final strings = AppLocalizations.of(context);
-    final asyncLevel = ref.watch(dashboardProvider);
+    final dashboard = ref.watch(dashboardProvider);
     final settings = ref.watch(settingsProvider);
     return Scaffold(
       backgroundColor: const Color(0xffeef7ff),
@@ -74,43 +74,27 @@ class DashboardScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: asyncLevel.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, _) => _StatusView(
-          title: strings.unreachable,
-          detail: error.toString(),
-          icon: Icons.wifi_off,
-        ),
-        data: (level) => _LevelView(level: level, settings: settings),
+      body: _LevelView(
+        level: dashboard.level ?? const LevelResponse(distanceCm: null, ageSeconds: null, status: LevelStatus.noReading, firmware: '—'),
+        settings: settings,
+        isLive: dashboard.isLive,
+        recordedAt: dashboard.recordedAt,
       ),
     );
   }
 }
 
 class _LevelView extends StatelessWidget {
-  const _LevelView({required this.level, required this.settings});
+  const _LevelView({required this.level, required this.settings, required this.isLive, required this.recordedAt});
   final LevelResponse level;
   final TankSettings settings;
+  final bool isLive;
+  final DateTime? recordedAt;
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context);
-    if (level.status == LevelStatus.noReading) {
-      return _StatusView(
-        title: strings.waitingSensor,
-        detail: strings.noReading,
-        icon: Icons.hourglass_empty,
-      );
-    }
-    if (level.status == LevelStatus.stale) {
-      return _StatusView(
-        title: strings.sensorNotResponding,
-        detail: strings.lastReading(level.ageSeconds ?? '?'),
-        icon: Icons.warning_amber,
-      );
-    }
-    final percent = settings.calculateLevelPercent(
-      level.distanceCm ?? settings.emptyDistanceCm,
-    );
+    final hasReading = level.distanceCm != null;
+    final percent = hasReading ? settings.calculateLevelPercent(level.distanceCm!) : 0.0;
     return SafeArea(
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
@@ -129,13 +113,13 @@ class _LevelView extends StatelessWidget {
                 Text(strings.liveMonitor, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.black54)),
               ]),
               const Spacer(),
-              _StatusChip(label: strings.online, color: const Color(0xff168b63), icon: Icons.wifi_rounded),
+              _StatusChip(label: isLive ? strings.online : strings.notLive, color: isLive ? const Color(0xff168b63) : const Color(0xffd05b4d), icon: isLive ? Icons.wifi_rounded : Icons.wifi_off_rounded),
             ],
           ),
           const SizedBox(height: 18),
           Container(
             padding: const EdgeInsets.fromLTRB(22, 22, 22, 24),
-            decoration: BoxDecoration(color: const Color(0xff087fbe), borderRadius: BorderRadius.circular(30), boxShadow: const [BoxShadow(color: Color(0x26087fbe), blurRadius: 18, offset: Offset(0, 10))]),
+            decoration: BoxDecoration(color: isLive ? const Color(0xff087fbe) : const Color(0xff607d91), borderRadius: BorderRadius.circular(30), boxShadow: const [BoxShadow(color: Color(0x26087fbe), blurRadius: 18, offset: Offset(0, 10))]),
             child: Stack(
               children: [
                 Positioned(top: -34, right: -28, child: _DecorativeBubble(size: 105, color: Colors.white.withAlpha(12))),
@@ -160,7 +144,7 @@ class _LevelView extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text('${percent.toStringAsFixed(0)}%', style: Theme.of(context).textTheme.displayMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w800, height: 1)),
+                    Text(hasReading ? '${percent.toStringAsFixed(0)}%' : '—%', style: Theme.of(context).textTheme.displayMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w800, height: 1)),
                     const SizedBox(width: 10),
                     Padding(padding: const EdgeInsets.only(bottom: 4), child: Text(strings.tankCapacity, style: TextStyle(color: Colors.white.withAlpha(190), fontWeight: FontWeight.w600))),
                   ],
@@ -185,7 +169,7 @@ class _LevelView extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Row(children: [
-            Expanded(child: _InfoTile(icon: Icons.schedule_rounded, label: strings.lastUpdate, value: strings.updatedAgo(level.ageSeconds ?? 0), accent: const Color(0xffe66f51))),
+            Expanded(child: _InfoTile(icon: Icons.schedule_rounded, label: strings.lastUpdate, value: recordedAt == null ? strings.unknown : strings.relativeTime(DateTime.now().difference(recordedAt!)), accent: const Color(0xffe66f51))),
             const SizedBox(width: 12),
             Expanded(child: _InfoTile(icon: Icons.memory_rounded, label: strings.firmware, value: level.firmware, accent: const Color(0xff7a68c7))),
           ]),

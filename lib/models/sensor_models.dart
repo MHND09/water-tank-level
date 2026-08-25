@@ -34,6 +34,12 @@ class LevelResponse {
   );
 }
 
+class StoredReading {
+  const StoredReading({required this.level, required this.recordedAt});
+  final LevelResponse level;
+  final DateTime recordedAt;
+}
+
 class TankSettings {
   const TankSettings({required this.baseUrl, required this.emptyDistanceCm, required this.fullDistanceCm, required this.pollInterval});
   final String baseUrl;

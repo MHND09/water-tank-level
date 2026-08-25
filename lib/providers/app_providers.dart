@@ -36,14 +36,33 @@ final tankRepositoryProvider = Provider<TankRepository>((ref) {
   return HttpTankRepository(settings.baseUrl);
 });
 
-class DashboardNotifier extends AsyncNotifier<LevelResponse> {
+class DashboardState {
+  const DashboardState({this.level, this.recordedAt, required this.isLive, this.isRefreshing = false, this.error});
+  final LevelResponse? level;
+  final DateTime? recordedAt;
+  final bool isLive;
+  final bool isRefreshing;
+  final Object? error;
+
+  DashboardState copyWith({LevelResponse? level, DateTime? recordedAt, bool? isLive, bool? isRefreshing, Object? error, bool clearError = false}) => DashboardState(
+    level: level ?? this.level,
+    recordedAt: recordedAt ?? this.recordedAt,
+    isLive: isLive ?? this.isLive,
+    isRefreshing: isRefreshing ?? this.isRefreshing,
+    error: clearError ? null : error ?? this.error,
+  );
+}
+
+class DashboardNotifier extends Notifier<DashboardState> {
   Timer? _timer;
 
   @override
-  Future<LevelResponse> build() async {
+  DashboardState build() {
+    final cached = ref.read(settingsStoreProvider).loadLastReading();
     ref.onDispose(() => _timer?.cancel());
     _schedulePolling();
-    return _fetch();
+    Future.microtask(refresh);
+    return DashboardState(level: cached?.level, recordedAt: cached?.recordedAt, isLive: false);
   }
 
   Future<LevelResponse> _fetch() async {
@@ -67,9 +86,23 @@ class DashboardNotifier extends AsyncNotifier<LevelResponse> {
   }
 
   Future<void> refresh() async {
-    state = const AsyncLoading<LevelResponse>().copyWithPrevious(state);
-    state = await AsyncValue.guard(_fetch);
+    if (state.isRefreshing) return;
+    state = state.copyWith(isRefreshing: true, clearError: true);
+    try {
+      final level = await _fetch().timeout(const Duration(seconds: 8));
+      final recordedAt = DateTime.now().subtract(Duration(seconds: level.ageSeconds ?? 0));
+      if (level.status == LevelStatus.ok) {
+        await ref.read(settingsStoreProvider).saveLastReading(level, recordedAt);
+      }
+      if (level.status == LevelStatus.ok) {
+        state = DashboardState(level: level, recordedAt: recordedAt, isLive: true, isRefreshing: false);
+      } else {
+        state = state.copyWith(isLive: false, isRefreshing: false, error: Exception(level.status.name));
+      }
+    } catch (error) {
+      state = state.copyWith(isLive: false, isRefreshing: false, error: error);
+    }
   }
 }
 
-final dashboardProvider = AsyncNotifierProvider<DashboardNotifier, LevelResponse>(DashboardNotifier.new);
+final dashboardProvider = NotifierProvider<DashboardNotifier, DashboardState>(DashboardNotifier.new);
