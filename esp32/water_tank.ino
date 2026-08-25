@@ -43,18 +43,33 @@ void pushReading(float value) {
 }
 
 float medianReading() {
+  if (readingCount == 0) return -1.0f;
   float sorted[MEDIAN_WINDOW];
   for (size_t i = 0; i < readingCount; i++) sorted[i] = readings[i];
   for (size_t i = 0; i < readingCount; i++) for (size_t j = i + 1; j < readingCount; j++) if (sorted[j] < sorted[i]) { float t = sorted[i]; sorted[i] = sorted[j]; sorted[j] = t; }
   return sorted[readingCount / 2];
 }
 
-void sendPing() { server.send(200, "application/json", String("{\"status\":\"ok\",\"fw\":\"") + FW_VERSION + "\"}"); }
+void sendPing() {
+  static char body[64];
+  snprintf(body, sizeof(body), "{\"status\":\"ok\",\"fw\":\"%s\"}", FW_VERSION);
+  server.send(200, "application/json", body);
+}
+
 void sendLevel() {
-  String body = "{\"distance_cm\":";
-  if (readingCount == 0) body += "null,\"age_s\":null,\"status\":\"no_reading\"";
-  else { const unsigned long age = (millis() - lastGoodMs) / 1000; body += String(medianReading(), 1) + ",\"age_s\":" + String(age) + ",\"status\":\"" + String(age * 1000 > STALE_AFTER_MS ? "stale" : "ok") + "\""; }
-  body += ",\"fw\":\"" + String(FW_VERSION) + "\"}";
+  static char body[128];
+  if (readingCount == 0) {
+    snprintf(body, sizeof(body),
+             "{\"distance_cm\":null,\"age_s\":null,\"status\":\"no_reading\",\"fw\":\"%s\"}",
+             FW_VERSION);
+  } else {
+    const unsigned long ageMs = millis() - lastGoodMs;
+    const char* status = (ageMs > STALE_AFTER_MS) ? "stale" : "ok";
+    const unsigned long age = ageMs / 1000;
+    snprintf(body, sizeof(body),
+             "{\"distance_cm\":%.1f,\"age_s\":%lu,\"status\":\"%s\",\"fw\":\"%s\"}",
+             medianReading(), age, status, FW_VERSION);
+  }
   server.send(200, "application/json", body);
 }
 
