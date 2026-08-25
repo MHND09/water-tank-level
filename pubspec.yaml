@@ -30,6 +30,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  google_fonts: ^6.3.2
   flutter_riverpod: ^3.0.0
   http: ^1.5.0
   shared_preferences: ^2.5.3

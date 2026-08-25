@@ -19,4 +19,14 @@ class SettingsStore {
     await preferences.setDouble('fullDistanceCm', settings.fullDistanceCm);
     await preferences.setInt('pollIntervalSeconds', settings.pollInterval.inSeconds);
   }
+
+  String? loadLanguage() => preferences.getString('language');
+
+  Future<void> saveLanguage(String? language) async {
+    if (language == null || language == 'system') {
+      await preferences.remove('language');
+    } else {
+      await preferences.setString('language', language);
+    }
+  }
 }

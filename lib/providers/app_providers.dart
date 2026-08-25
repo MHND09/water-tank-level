@@ -14,11 +14,27 @@ class SettingsNotifier extends Notifier<TankSettings> {
   Future<void> save(TankSettings value) async {
     await ref.read(settingsStoreProvider).save(value);
     state = value;
+    ref.invalidate(tankRepositoryProvider);
+    ref.invalidate(dashboardProvider);
   }
 }
 
 final settingsProvider = NotifierProvider<SettingsNotifier, TankSettings>(SettingsNotifier.new);
-final tankRepositoryProvider = Provider<TankRepository>((ref) => FakeTankRepository());
+final languageProvider = NotifierProvider<LanguageNotifier, String?>(LanguageNotifier.new);
+
+class LanguageNotifier extends Notifier<String?> {
+  @override
+  String? build() => ref.read(settingsStoreProvider).loadLanguage();
+
+  Future<void> setLanguage(String? language) async {
+    await ref.read(settingsStoreProvider).saveLanguage(language);
+    state = language;
+  }
+}
+final tankRepositoryProvider = Provider<TankRepository>((ref) {
+  final settings = ref.watch(settingsProvider);
+  return HttpTankRepository(settings.baseUrl);
+});
 
 class DashboardNotifier extends AsyncNotifier<LevelResponse> {
   Timer? _timer;

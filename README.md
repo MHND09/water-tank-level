@@ -14,8 +14,10 @@ flutter test
 flutter run
 ```
 
-The first app slice uses a fake repository, so it can be developed without hardware.
-The HTTP repository is ready for the ESP32 and a future Python mock server.
+The app now uses the real HTTP repository. Set the ESP32 address in Settings. For
+development without hardware, run `python tools/mock_esp32_server.py` on a computer
+on the same WiFi network, then set the app address to that computer's LAN address
+and port (for example `http://192.168.1.20:8080`).
 
 ## ESP32 development
 
@@ -30,3 +32,13 @@ static IP.
 
 See `docs/water_tank_monitor_technical_spec.md` for wiring, API, and sensor behavior,
 and `docs/project_decisions.md` for implementation decisions.
+
+## Python ESP32 mock
+
+```text
+python tools/mock_esp32_server.py
+```
+
+The server exposes `/ping` and `/level`. In its terminal, use `+`/Up to increase
+distance, `-`/Down to decrease distance, `n` for `no_reading`, `s` for `stale`,
+`o` for normal readings, and `q` to stop the server.
