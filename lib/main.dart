@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -46,10 +48,49 @@ class AquaLevelApp extends ConsumerWidget {
   }
 }
 
-class DashboardScreen extends ConsumerWidget {
+class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends ConsumerState<DashboardScreen> with WidgetsBindingObserver {
+  Timer? _relativeTimeTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _startRelativeTimeTimer();
+  }
+
+  void _startRelativeTimeTimer() {
+    _relativeTimeTimer?.cancel();
+    _relativeTimeTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _relativeTimeTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startRelativeTimeTimer();
+      ref.read(dashboardProvider.notifier).resumePolling();
+    } else if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      _relativeTimeTimer?.cancel();
+      ref.read(dashboardProvider.notifier).pausePolling();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context);
     final dashboard = ref.watch(dashboardProvider);
     final settings = ref.watch(settingsProvider);
@@ -69,15 +110,18 @@ class DashboardScreen extends ConsumerWidget {
           ),
           IconButton(
             tooltip: strings.refresh,
-            icon: const Icon(Icons.refresh_rounded, size: 21),
-            onPressed: () => ref.read(dashboardProvider.notifier).refresh(),
+            icon: dashboard.isRefreshing
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.4))
+                : const Icon(Icons.refresh_rounded, size: 21),
+            onPressed: dashboard.isRefreshing ? null : () => ref.read(dashboardProvider.notifier).refresh(),
           ),
         ],
       ),
       body: _LevelView(
         level: dashboard.level ?? const LevelResponse(distanceCm: null, ageSeconds: null, status: LevelStatus.noReading, firmware: '—'),
         settings: settings,
-        isLive: dashboard.isLive,
+        status: dashboard.status,
+        isRefreshing: dashboard.isRefreshing,
         recordedAt: dashboard.recordedAt,
       ),
     );
@@ -85,15 +129,31 @@ class DashboardScreen extends ConsumerWidget {
 }
 
 class _LevelView extends StatelessWidget {
-  const _LevelView({required this.level, required this.settings, required this.isLive, required this.recordedAt});
+  const _LevelView({required this.level, required this.settings, required this.status, required this.isRefreshing, required this.recordedAt});
   final LevelResponse level;
   final TankSettings settings;
-  final bool isLive;
+  final DashboardStatus status;
+  final bool isRefreshing;
   final DateTime? recordedAt;
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context);
     final hasReading = level.distanceCm != null;
+    final isLive = status == DashboardStatus.live;
+    final statusLabel = switch (status) {
+      DashboardStatus.connecting => strings.connecting,
+      DashboardStatus.live => strings.online,
+      DashboardStatus.unreachable => strings.notLive,
+      DashboardStatus.noReading => strings.sensorWaiting,
+      DashboardStatus.stale => strings.sensorStale,
+    };
+    final statusIcon = switch (status) {
+      DashboardStatus.live => Icons.wifi_rounded,
+      DashboardStatus.connecting => Icons.sync_rounded,
+      DashboardStatus.noReading => Icons.hourglass_empty_rounded,
+      DashboardStatus.stale => Icons.warning_amber_rounded,
+      DashboardStatus.unreachable => Icons.wifi_off_rounded,
+    };
     final percent = hasReading ? settings.calculateLevelPercent(level.distanceCm!) : 0.0;
     return SafeArea(
       child: ListView(
@@ -113,7 +173,7 @@ class _LevelView extends StatelessWidget {
                 Text(strings.liveMonitor, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.black54)),
               ]),
               const Spacer(),
-              _StatusChip(label: isLive ? strings.online : strings.notLive, color: isLive ? const Color(0xff168b63) : const Color(0xffd05b4d), icon: isLive ? Icons.wifi_rounded : Icons.wifi_off_rounded),
+              _StatusChip(label: statusLabel, color: isLive ? const Color(0xff168b63) : const Color(0xffd05b4d), icon: statusIcon),
             ],
           ),
           const SizedBox(height: 18),
@@ -146,7 +206,7 @@ class _LevelView extends StatelessWidget {
                   children: [
                     Text(hasReading ? '${percent.toStringAsFixed(0)}%' : '—%', style: Theme.of(context).textTheme.displayMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w800, height: 1)),
                     const SizedBox(width: 10),
-                    Padding(padding: const EdgeInsets.only(bottom: 4), child: Text(strings.tankCapacity, style: TextStyle(color: Colors.white.withAlpha(190), fontWeight: FontWeight.w600))),
+                    Padding(padding: const EdgeInsets.only(bottom: 4), child: Text(isRefreshing ? strings.retrying : strings.tankCapacity, style: TextStyle(color: Colors.white.withAlpha(190), fontWeight: FontWeight.w600))),
                   ],
                 ),
                 const SizedBox(height: 20),
@@ -167,6 +227,20 @@ class _LevelView extends StatelessWidget {
               ],
             ),
           ),
+          if (!isLive) ...[
+            const SizedBox(height: 14),
+            _StateNotice(
+              icon: statusIcon,
+              title: statusLabel,
+              detail: switch (status) {
+                DashboardStatus.connecting => strings.connectingDetail,
+                DashboardStatus.unreachable => strings.unreachableDetail,
+                DashboardStatus.noReading => strings.noReadingDetail,
+                DashboardStatus.stale => strings.staleDetail,
+                DashboardStatus.live => '',
+              },
+            ),
+          ],
           const SizedBox(height: 16),
           Row(children: [
             Expanded(child: _InfoTile(icon: Icons.schedule_rounded, label: strings.lastUpdate, value: recordedAt == null ? strings.unknown : strings.relativeTime(DateTime.now().difference(recordedAt!)), accent: const Color(0xffe66f51))),
@@ -179,6 +253,24 @@ class _LevelView extends StatelessWidget {
       ),
     );
   }
+}
+
+class _StateNotice extends StatelessWidget {
+  const _StateNotice({required this.icon, required this.title, required this.detail});
+  final IconData icon;
+  final String title;
+  final String detail;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(color: const Color(0xffffeeee), borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xffffc8c2))),
+    child: Row(children: [
+      Container(width: 38, height: 38, decoration: const BoxDecoration(color: Color(0xffffd6d1), shape: BoxShape.circle), child: Icon(icon, color: const Color(0xffbd493f), size: 20)),
+      const SizedBox(width: 12),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xff8f3029))), const SizedBox(height: 2), Text(detail, style: const TextStyle(color: Color(0xff76504d), fontSize: 13))])),
+    ]),
+  );
 }
 
 class _StatusChip extends StatelessWidget {

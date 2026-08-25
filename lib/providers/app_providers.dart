@@ -33,21 +33,26 @@ class LanguageNotifier extends Notifier<String?> {
 }
 final tankRepositoryProvider = Provider<TankRepository>((ref) {
   final settings = ref.watch(settingsProvider);
-  return HttpTankRepository(settings.baseUrl);
+  final repository = HttpTankRepository(settings.baseUrl);
+  ref.onDispose(repository.close);
+  return repository;
 });
 
+enum DashboardStatus { connecting, live, unreachable, noReading, stale }
+
 class DashboardState {
-  const DashboardState({this.level, this.recordedAt, required this.isLive, this.isRefreshing = false, this.error});
+  const DashboardState({this.level, this.recordedAt, required this.status, this.isRefreshing = false, this.error});
   final LevelResponse? level;
   final DateTime? recordedAt;
-  final bool isLive;
+  final DashboardStatus status;
   final bool isRefreshing;
   final Object? error;
+  bool get isLive => status == DashboardStatus.live;
 
-  DashboardState copyWith({LevelResponse? level, DateTime? recordedAt, bool? isLive, bool? isRefreshing, Object? error, bool clearError = false}) => DashboardState(
+  DashboardState copyWith({LevelResponse? level, DateTime? recordedAt, DashboardStatus? status, bool? isRefreshing, Object? error, bool clearError = false}) => DashboardState(
     level: level ?? this.level,
     recordedAt: recordedAt ?? this.recordedAt,
-    isLive: isLive ?? this.isLive,
+    status: status ?? this.status,
     isRefreshing: isRefreshing ?? this.isRefreshing,
     error: clearError ? null : error ?? this.error,
   );
@@ -62,7 +67,7 @@ class DashboardNotifier extends Notifier<DashboardState> {
     ref.onDispose(() => _timer?.cancel());
     _schedulePolling();
     Future.microtask(refresh);
-    return DashboardState(level: cached?.level, recordedAt: cached?.recordedAt, isLive: false);
+    return DashboardState(level: cached?.level, recordedAt: cached?.recordedAt, status: DashboardStatus.connecting);
   }
 
   Future<LevelResponse> _fetch() async {
@@ -85,6 +90,16 @@ class DashboardNotifier extends Notifier<DashboardState> {
     _timer = Timer.periodic(ref.read(settingsProvider).pollInterval, (_) => refresh());
   }
 
+  void pausePolling() {
+    _timer?.cancel();
+    _timer = null;
+  }
+
+  void resumePolling() {
+    _schedulePolling();
+    refresh();
+  }
+
   Future<void> refresh() async {
     if (state.isRefreshing) return;
     state = state.copyWith(isRefreshing: true, clearError: true);
@@ -95,12 +110,16 @@ class DashboardNotifier extends Notifier<DashboardState> {
         await ref.read(settingsStoreProvider).saveLastReading(level, recordedAt);
       }
       if (level.status == LevelStatus.ok) {
-        state = DashboardState(level: level, recordedAt: recordedAt, isLive: true, isRefreshing: false);
+        state = DashboardState(level: level, recordedAt: recordedAt, status: DashboardStatus.live, isRefreshing: false);
       } else {
-        state = state.copyWith(isLive: false, isRefreshing: false, error: Exception(level.status.name));
+        state = state.copyWith(
+          status: level.status == LevelStatus.stale ? DashboardStatus.stale : DashboardStatus.noReading,
+          isRefreshing: false,
+          error: Exception(level.status.name),
+        );
       }
     } catch (error) {
-      state = state.copyWith(isLive: false, isRefreshing: false, error: error);
+      state = state.copyWith(status: DashboardStatus.unreachable, isRefreshing: false, error: error);
     }
   }
 }

@@ -14,9 +14,17 @@ class AppLocalizations {
 
   String get appTitle => isFrench ? 'Aqua Niveau' : 'Aqua Level';
   String get tankOverview => isFrench ? 'Vue du réservoir' : 'Tank overview';
-  String get liveMonitor => isFrench ? "Suivi en direct du niveau d'eau" : 'Live household water monitor';
+  String get liveMonitor => isFrench ? "Suivi en direct du niveau d'eau" : 'Live water monitor';
   String get online => isFrench ? 'En ligne' : 'Online';
   String get notLive => isFrench ? 'Hors ligne' : 'Not live';
+  String get connecting => isFrench ? 'Connexion...' : 'Connecting...';
+  String get sensorWaiting => isFrench ? 'Capteur en attente' : 'Sensor waiting';
+  String get sensorStale => isFrench ? 'Mesure périmée' : 'Stale reading';
+  String get retrying => isFrench ? 'Actualisation...' : 'Refreshing...';
+  String get connectingDetail => isFrench ? 'Connexion au boîtier du réservoir.' : 'Connecting to the tank unit.';
+  String get unreachableDetail => isFrench ? 'Boîtier inaccessible. Dernière mesure enregistrée affichée.' : 'Tank unit unreachable. Showing the last saved reading.';
+  String get noReadingDetail => isFrench ? 'Boîtier connecté, mais aucune nouvelle mesure valide.' : 'Tank unit connected, but no valid reading is available.';
+  String get staleDetail => isFrench ? 'La mesure du capteur est trop ancienne. Dernière mesure valide affichée.' : 'The sensor reading is too old. Showing the last valid reading.';
   String get unknown => isFrench ? 'Aucune mesure' : 'No reading';
   String relativeTime(Duration age) {
     if (age.isNegative || age.inSeconds < 10) return isFrench ? "à l'instant" : 'Just now';
