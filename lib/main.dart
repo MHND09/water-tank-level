@@ -113,28 +113,40 @@ class _LevelView extends StatelessWidget {
               borderRadius: BorderRadius.circular(28),
               boxShadow: const [BoxShadow(color: Color(0x26087fbe), blurRadius: 18, offset: Offset(0, 10))],
             ),
-            child: Column(children: [
-              Row(children: [
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Current level', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.white70)),
-                  const SizedBox(height: 4),
-                  Text('${percent.toStringAsFixed(0)}%', style: Theme.of(context).textTheme.displayMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w800)),
-                  Text(percent > 70 ? 'Plenty of water available' : 'Keep an eye on the tank', style: const TextStyle(color: Colors.white70)),
-                ])),
-                TweenAnimationBuilder<double>(
-                  tween: Tween(begin: 0, end: percent / 100),
-                  duration: const Duration(milliseconds: 900),
-                  curve: Curves.easeOutCubic,
-                  builder: (_, animatedLevel, __) => SizedBox(
-                    width: 116,
-                    height: 150,
-                    child: CustomPaint(painter: _TankPainter(animatedLevel)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Current level', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.white70)),
+                    Icon(Icons.water_drop_outlined, color: Colors.white.withAlpha(180), size: 24),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text('${percent.toStringAsFixed(0)}%', style: Theme.of(context).textTheme.displayMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w800, height: 1)),
+                    const SizedBox(width: 12),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Center(
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0, end: percent / 100),
+                    duration: const Duration(milliseconds: 900),
+                    curve: Curves.easeOutCubic,
+                    builder: (_, animatedLevel, __) => SizedBox(
+                      width: 150,
+                      height: 190,
+                      child: CustomPaint(painter: _TankPainter(animatedLevel)),
+                    ),
                   ),
                 ),
-              ]),
-              const SizedBox(height: 14),
-              ClipRRect(borderRadius: BorderRadius.circular(99), child: LinearProgressIndicator(value: percent / 100, minHeight: 12, backgroundColor: Colors.white30, valueColor: const AlwaysStoppedAnimation(Colors.white))),
-            ]),
+              ],
+            ),
           ),
           const SizedBox(height: 16),
           Row(children: [
