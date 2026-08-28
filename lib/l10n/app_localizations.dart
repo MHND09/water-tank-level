@@ -56,7 +56,7 @@ class AppLocalizations {
   String get waitingSensor => isFrench ? 'En attente du capteur' : 'Waiting for sensor';
   String get noReading => isFrench ? 'Aucune mesure valide reçue pour le moment.' : 'No valid reading has been received yet.';
   String get sensorNotResponding => isFrench ? 'Le capteur ne répond pas' : 'Sensor not responding';
-  String lastReading(Object age) => isFrench ? 'La dernière mesure date de ${age} secondes.' : 'Last reading is ${age} seconds old.';
+  String lastReading(Object age) => isFrench ? 'La dernière mesure date de $age secondes.' : 'Last reading is $age seconds old.';
   String get unreachable => isFrench ? 'ESP32 inaccessible' : 'ESP32 unreachable';
   String get settingsTitle => isFrench ? 'Réglages' : 'Settings';
   String get espAddress => isFrench ? 'Adresse ESP32' : 'ESP32 address';
