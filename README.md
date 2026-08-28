@@ -26,6 +26,41 @@ select the correct ESP32 board and serial port, then replace the WiFi and OTA
 placeholder credentials before the first USB upload. The sketch uses only libraries
 included with the ESP32 Arduino core.
 
+### Raw sensor data collection
+
+For a diagnostic fill/empty cycle, open `esp32/sensor_logger/sensor_logger.ino` as a
+separate Arduino IDE sketch. It uses the same pins and credentials, keeps ArduinoOTA
+enabled, and deliberately applies no blind-zone threshold or filtering. At 115200 baud,
+the Serial Monitor prints CSV rows:
+
+```text
+sample,millis,duration_us,distance_cm,result
+```
+
+Save the serial output from before filling until after emptying. The latest raw sample is
+also available at `http://<esp32-ip>/reading`. After the experiment, open the original
+`esp32/water_tank.ino` and upload it over OTA to restore the monitoring firmware.
+
+If USB is unavailable, run the HTTP collector from a computer on the same WiFi network:
+
+```text
+python tools/collect_sensor_data.py --url http://<esp32-ip>/reading --output tank_cycle.csv
+```
+
+It polls once per second, skips duplicate samples, flushes each new row to disk, and
+continues through temporary request failures. Stop it with `Ctrl+C` after the cycle.
+
+To see the same collected readings live in a browser, use the dashboard server instead
+of running the collector separately:
+
+```text
+python tools/sensor_dashboard_server.py --url http://<esp32-ip>/reading --output tank_cycle.csv
+```
+
+Open `http://127.0.0.1:8080/`. The Python server makes the only `/reading` requests,
+writes the CSV, and broadcasts each new sample to the page; the page never contacts the
+ESP32 directly.
+
 Keep the ArduinoOTA code in every future firmware upload. Configure a router DHCP
 reservation for the ESP32 MAC address at `192.168.1.12`; do not configure a firmware
 static IP.

@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tank Sensor Logger</title>
+  <style>
+    :root { color-scheme: light; --ink: #17232b; --muted: #65747c; --line: #d6e1e3; --water: #087f8c; --water-soft: #d9f1f0; --paper: #f5f7f3; --panel: #ffffff; --alert: #a94b27; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; color: var(--ink); background: radial-gradient(circle at 85% 0%, #d8ece5 0, transparent 32rem), var(--paper); font: 16px/1.45 Georgia, serif; }
+    main { width: min(1100px, calc(100% - 32px)); margin: 0 auto; padding: 42px 0 56px; }
+    header { display: flex; justify-content: space-between; gap: 24px; align-items: end; margin-bottom: 28px; }
+    h1 { margin: 0; font-size: clamp(2rem, 5vw, 4.2rem); line-height: .95; font-weight: 500; letter-spacing: 0; }
+    .eyebrow { margin: 0 0 10px; color: var(--water); font: 700 12px/1.2 Consolas, monospace; letter-spacing: 1px; text-transform: uppercase; }
+    .connection { display: flex; align-items: center; gap: 9px; color: var(--muted); font: 14px Consolas, monospace; white-space: nowrap; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--alert); }
+    .dot.live { background: #2e8b57; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+    .stat, .chart-panel { background: var(--panel); border: 1px solid var(--line); }
+    .stat { min-height: 112px; padding: 17px; }
+    .label { color: var(--muted); font: 12px Consolas, monospace; text-transform: uppercase; letter-spacing: .5px; }
+    .value { margin-top: 9px; font-size: 2rem; line-height: 1; }
+    .value small { color: var(--muted); font: 14px Consolas, monospace; }
+    .chart-panel { padding: 18px; }
+    .chart-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+    .chart-head h2 { margin: 0; font-size: 1.25rem; font-weight: 500; }
+    .chart-box { position: relative; width: 100%; height: min(56vw, 480px); min-height: 280px; }
+    .note { min-height: 24px; margin: 14px 2px 0; color: var(--muted); font: 13px Consolas, monospace; }
+    @media (max-width: 700px) { main { padding-top: 28px; } header { display: block; } .connection { margin-top: 18px; } .stats { grid-template-columns: repeat(2, 1fr); } .stat { min-height: 94px; } .value { font-size: 1.55rem; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div><p class="eyebrow">Raw measurement stream</p><h1>Tank sensor</h1></div>
+      <div class="connection"><span id="dot" class="dot"></span><span id="connection">Connecting to collector</span></div>
+    </header>
+    <section class="stats" aria-label="Latest reading">
+      <div class="stat"><div class="label">Distance</div><div id="distance" class="value">-- <small>cm</small></div></div>
+      <div class="stat"><div class="label">Echo time</div><div id="duration" class="value">-- <small>us</small></div></div>
+      <div class="stat"><div class="label">Samples</div><div id="samples" class="value">0</div></div>
+      <div class="stat"><div class="label">Last update</div><div id="updated" class="value">--</div></div>
+    </section>
+    <section class="chart-panel">
+      <div class="chart-head"><h2>Distance over time</h2><span id="range" class="label">waiting for data</span></div>
+      <div class="chart-box"><canvas id="chart"></canvas></div>
+      <p id="note" class="note">The Python collector polls the ESP32 once and broadcasts each sample here.</p>
+    </section>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
+  <script>
+    const maxPoints = 1800;
+    let received = 0;
+
+    const axisFont = { family: 'Consolas, monospace', size: 11 };
+    const titleFont = { family: 'Consolas, monospace', size: 12, weight: '700' };
+
+    const chart = new Chart(document.getElementById('chart').getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Distance (cm)',
+          data: [],
+          borderColor: '#087f8c',
+          backgroundColor: 'rgba(8, 127, 140, 0.10)',
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          pointHoverBackgroundColor: '#087f8c',
+          spanGaps: false,
+          tension: 0.15,
+          fill: true,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        interaction: { mode: 'nearest', intersect: false },
+        scales: {
+          x: {
+            type: 'linear',
+            title: { display: true, text: 'Sample #', color: '#65747c', font: titleFont },
+            grid: { display: true, color: '#e4ebec', drawTicks: true, tickLength: 6 },
+            border: { display: true, color: '#17232b', width: 1 },
+            ticks: { color: '#65747c', font: axisFont, maxTicksLimit: 10 }
+          },
+          y: {
+            title: { display: true, text: 'Distance (cm)', color: '#65747c', font: titleFont },
+            grid: { display: true, color: '#e4ebec', drawTicks: true, tickLength: 6 },
+            border: { display: true, color: '#17232b', width: 1 },
+            ticks: { color: '#65747c', font: axisFont }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#17232b',
+            titleFont: { family: 'Consolas, monospace' },
+            bodyFont: { family: 'Consolas, monospace' },
+            padding: 8,
+            displayColors: false,
+            callbacks: {
+              title: items => `Sample ${items[0].label}`,
+              label: item => Number.isFinite(item.parsed.y) ? `${item.parsed.y.toFixed(2)} cm` : 'timeout'
+            }
+          }
+        }
+      }
+    });
+
+    function showReading(reading) {
+      const distance = Number(reading.distance_cm);
+      const timedOut = reading.result === 'timeout' || reading.duration_us === 0;
+      received++;
+
+      chart.data.labels.push(received);
+      chart.data.datasets[0].data.push(timedOut ? NaN : distance);
+      if (chart.data.labels.length > maxPoints) {
+        chart.data.labels.shift();
+        chart.data.datasets[0].data.shift();
+      }
+      chart.update('none');
+
+      const visibleValues = chart.data.datasets[0].data.filter(Number.isFinite);
+      document.getElementById('distance').innerHTML = Number.isFinite(distance) && !timedOut ? `${distance.toFixed(2)} <small>cm</small>` : '-- <small>timeout</small>';
+      document.getElementById('duration').innerHTML = timedOut ? '-- <small>us</small>' : `${reading.duration_us} <small>us</small>`;
+      document.getElementById('samples').textContent = received.toLocaleString();
+      document.getElementById('updated').textContent = new Date().toLocaleTimeString();
+      document.getElementById('range').textContent = visibleValues.length > 1 ? `${Math.min(...visibleValues).toFixed(1)}–${Math.max(...visibleValues).toFixed(1)} cm` : visibleValues.length === 1 ? 'one sample' : 'timeouts only';
+      document.getElementById('note').textContent = timedOut ? 'No echo arrived before the timeout.' : 'Raw echo received; no filtering or blind-zone classification is applied.';
+    }
+
+    const events = new EventSource('/events');
+    events.onopen = () => { document.getElementById('dot').classList.add('live'); document.getElementById('connection').textContent = 'Live from Python collector'; };
+    events.onerror = () => { document.getElementById('dot').classList.remove('live'); document.getElementById('connection').textContent = 'Reconnecting to collector'; };
+    events.onmessage = event => showReading(JSON.parse(event.data));
+  </script>
+</body>
+</html>

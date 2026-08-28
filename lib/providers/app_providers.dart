@@ -38,7 +38,7 @@ final tankRepositoryProvider = Provider<TankRepository>((ref) {
   return repository;
 });
 
-enum DashboardStatus { connecting, live, unreachable, noReading, stale }
+enum DashboardStatus { connecting, live, belowRange, unreachable, noReading, stale }
 
 class DashboardState {
   const DashboardState({this.level, this.recordedAt, required this.status, this.isRefreshing = false, this.error});
@@ -48,6 +48,10 @@ class DashboardState {
   final bool isRefreshing;
   final Object? error;
   bool get isLive => status == DashboardStatus.live;
+
+  /// `belowRange` is good news — a full tank — so it renders as a healthy state
+  /// rather than a fault, even though it carries no exact distance.
+  bool get isHealthy => status == DashboardStatus.live || status == DashboardStatus.belowRange;
 
   DashboardState copyWith({LevelResponse? level, DateTime? recordedAt, DashboardStatus? status, bool? isRefreshing, Object? error, bool clearError = false}) => DashboardState(
     level: level ?? this.level,
@@ -106,11 +110,14 @@ class DashboardNotifier extends Notifier<DashboardState> {
     try {
       final level = await _fetch().timeout(const Duration(seconds: 8));
       final recordedAt = DateTime.now().subtract(Duration(seconds: level.ageSeconds ?? 0));
-      if (level.status == LevelStatus.ok) {
+      if (level.status == LevelStatus.ok || level.status == LevelStatus.belowRange) {
         await ref.read(settingsStoreProvider).saveLastReading(level, recordedAt);
-      }
-      if (level.status == LevelStatus.ok) {
-        state = DashboardState(level: level, recordedAt: recordedAt, status: DashboardStatus.live, isRefreshing: false);
+        state = DashboardState(
+          level: level,
+          recordedAt: recordedAt,
+          status: level.status == LevelStatus.ok ? DashboardStatus.live : DashboardStatus.belowRange,
+          isRefreshing: false,
+        );
       } else {
         state = state.copyWith(
           status: level.status == LevelStatus.stale ? DashboardStatus.stale : DashboardStatus.noReading,
