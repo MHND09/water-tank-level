@@ -228,7 +228,7 @@ class _LevelView extends StatelessWidget {
                     tween: Tween(begin: 0, end: percent / 100),
                     duration: const Duration(milliseconds: 900),
                     curve: Curves.easeOutCubic,
-                    builder: (_, animatedLevel, __) => SizedBox(
+                    builder: (_, animatedLevel, _) => SizedBox(
                       width: 150,
                       height: 190,
                       child: CustomPaint(
@@ -425,32 +425,6 @@ class _TankPainter extends CustomPainter {
       oldDelegate.level != level || oldDelegate.ceiling != ceiling || oldDelegate.band != band;
 }
 
-class _StatusView extends StatelessWidget {
-  const _StatusView({
-    required this.title,
-    required this.detail,
-    required this.icon,
-  });
-  final String title, detail;
-  final IconData icon;
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 56),
-          const SizedBox(height: 16),
-          Text(title, style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 8),
-          Text(detail, textAlign: TextAlign.center),
-        ],
-      ),
-    ),
-  );
-}
-
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
   @override
@@ -582,7 +556,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           final strings = AppLocalizations.of(context);
           final selectedLanguage = ref.watch(languageProvider) ?? 'system';
           return DropdownButtonFormField<String>(
-            value: selectedLanguage,
+            initialValue: selectedLanguage,
             decoration: InputDecoration(labelText: strings.language, prefixIcon: const Icon(Icons.language_rounded)),
             items: [
               DropdownMenuItem(value: 'system', child: Text(strings.systemLanguage)),
